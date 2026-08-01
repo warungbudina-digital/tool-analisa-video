@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 0 = core deterministik (ringan); 1 = + model HF (whisper/CLIP) di-bake
 ARG WITH_ML=0
 ENV HF_HOME=/app/models_cache \
+    WHISPER_DIR=/app/models_cache/whisper \
     HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1 \
     PYTHONUNBUFFERED=1

@@ -6,17 +6,18 @@ from app.models import SubtitleSegment, SubtitleStyle
 
 _model = None
 _MODEL_SIZE = os.getenv("ASR_MODEL", "base")
+_MODEL_DIR = os.getenv("WHISPER_DIR", "/app/models_cache/whisper")
 
 
 def _load():
-    """Muat faster-whisper sekali. None kalau lib/model tak tersedia (V1 core)."""
+    """Muat openai-whisper sekali. None kalau lib/model tak tersedia (V1 core)."""
     global _model
     if _model is not None:
         return _model
     try:
-        from faster_whisper import WhisperModel
+        import whisper
 
-        _model = WhisperModel(_MODEL_SIZE, device="cpu", compute_type="int8")
+        _model = whisper.load_model(_MODEL_SIZE, download_root=_MODEL_DIR)
         return _model
     except Exception:
         return None
@@ -31,17 +32,19 @@ def transcribe(path: str) -> tuple[list[SubtitleSegment], SubtitleStyle]:
     if model is None:
         return [], SubtitleStyle()
 
-    segments, _info = model.transcribe(path, vad_filter=True)
+    result = model.transcribe(path, fp16=False)  # fp16=False -> CPU
     segs: list[SubtitleSegment] = []
     total_words = 0
     total_dur = 0.0
-    for s in segments:
-        text = (s.text or "").strip()
+    for s in result.get("segments", []):
+        text = (s.get("text") or "").strip()
         if not text:
             continue
-        segs.append(SubtitleSegment(text=text, start=round(s.start, 3), end=round(s.end, 3)))
+        start = float(s.get("start", 0.0))
+        end = float(s.get("end", 0.0))
+        segs.append(SubtitleSegment(text=text, start=round(start, 3), end=round(end, 3)))
         total_words += len(text.split())
-        total_dur += max(s.end - s.start, 0.0)
+        total_dur += max(end - start, 0.0)
 
     wca = round(total_words / len(segs), 2) if segs else None
     wps = (total_words / total_dur) if total_dur > 0 else 0.0
