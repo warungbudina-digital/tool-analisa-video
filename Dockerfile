@@ -22,9 +22,12 @@ COPY requirements.txt requirements-ml.txt bake_models.py ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Lapisan model (V2): torch CPU-only (dari index pytorch cpu) + deps ML + bake model OFFLINE
+# setuptools<81 + --no-build-isolation: openai-whisper (sdist) setup.py import pkg_resources,
+# yg dibuang setuptools>=81 -> pakai setuptools lama dari env ini.
 RUN if [ "$WITH_ML" = "1" ]; then \
+        pip install --no-cache-dir "setuptools<81" wheel && \
         pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu && \
-        pip install --no-cache-dir -r requirements-ml.txt && \
+        pip install --no-cache-dir --no-build-isolation -r requirements-ml.txt && \
         HF_HUB_OFFLINE=0 TRANSFORMERS_OFFLINE=0 python bake_models.py ; \
     fi
 
