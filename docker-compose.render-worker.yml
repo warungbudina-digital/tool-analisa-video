@@ -1,0 +1,26 @@
+services:
+  viral_analyzer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        WITH_ML: "${WITH_ML:-0}"     # 0=core deterministik, 1=+model HF (whisper/CLIP)
+    container_name: viral_analyzer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${VIRAL_ANALYZER_PORT:-9021}:9021"
+    environment:
+      VIRAL_ANALYZER_INPUT_DIR: /data/input
+      ASR_MODEL: "${ASR_MODEL:-base}"
+      CLIP_MODEL: "${CLIP_MODEL:-openai/clip-vit-base-patch32}"
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ${VIRAL_ANALYZER_INPUT_DIR:-./data/input}:/data/input:ro
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:9021/healthz', timeout=5)\" || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    mem_limit: 4g
+    cpus: 3.0

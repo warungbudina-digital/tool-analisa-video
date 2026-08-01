@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+/data/
+*.mp4
+*.mov
+*.mkv
+*.wav
+*.mp3
+*.srt
+models_cache/
