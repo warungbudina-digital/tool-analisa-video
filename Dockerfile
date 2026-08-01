@@ -20,8 +20,9 @@ ENV HF_HOME=/app/models_cache \
 COPY requirements.txt requirements-ml.txt bake_models.py ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Lapisan model (V2): install deps ML + unduh model SEKARANG agar runtime OFFLINE
+# Lapisan model (V2): torch CPU-only (dari index pytorch cpu) + deps ML + bake model OFFLINE
 RUN if [ "$WITH_ML" = "1" ]; then \
+        pip install --no-cache-dir torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu && \
         pip install --no-cache-dir -r requirements-ml.txt && \
         HF_HUB_OFFLINE=0 TRANSFORMERS_OFFLINE=0 python bake_models.py ; \
     fi

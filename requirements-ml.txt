@@ -1,5 +1,8 @@
-# Lapisan model HF (V2) - berat; di-bake ke image saat WITH_ML=1
+# Lapisan model HF (V2) - di-bake ke image saat WITH_ML=1
+# CATATAN: torch (CPU-only) diinstal TERPISAH di Dockerfile dari index PyTorch cpu,
+# supaya TIDAK menyeret pustaka CUDA ~2.5GB (kritis utk disk Cloud Shell).
+# faster-whisper pakai ctranslate2 (bukan torch) -> ringan.
 faster-whisper==1.0.3
-torch==2.5.1
+ctranslate2==4.4.0
 transformers==4.46.3
 pillow==11.0.0
