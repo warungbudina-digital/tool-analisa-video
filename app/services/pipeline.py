@@ -75,10 +75,12 @@ def analyze(video_path: str, run_asr: bool | None = None,
 
     subtitle_segments = []
     subtitle_style = SubtitleStyle()
-    if do_asr:
+    if do_asr and meta.has_audio:
         t = time.perf_counter()
         subtitle_segments, subtitle_style = asr.transcribe(video_path)
         timings["asr"] = _ms(t)
+    elif do_asr and not meta.has_audio:
+        warnings.append("asr_skipped_no_audio")
 
     analysis = ViralAnalysis(
         video=os.path.basename(video_path),
