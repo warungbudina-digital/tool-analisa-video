@@ -10,12 +10,14 @@ services:
     ports:
       - "127.0.0.1:${VIRAL_ANALYZER_PORT:-9021}:9021"
     environment:
+      # Path DI DALAM container tempat app membaca video. Tetap /data/input; jangan
+      # atur lewat .env — sumber HOST diatur terpisah via VIRAL_ANALYZER_HOST_INPUT_DIR.
       VIRAL_ANALYZER_INPUT_DIR: /data/input
       ASR_MODEL: "${ASR_MODEL:-base}"
       CLIP_MODEL: "${CLIP_MODEL:-openai/clip-vit-base-patch32}"
-      PYTHONUNBUFFERED: "1"
     volumes:
-      - ${VIRAL_ANALYZER_INPUT_DIR:-./data/input}:/data/input:ro
+      # Sumber HOST (default ./data/input) -> /data/input (read-only) di dalam container.
+      - ${VIRAL_ANALYZER_HOST_INPUT_DIR:-./data/input}:/data/input:ro
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:9021/healthz', timeout=5)\" || exit 1"]
       interval: 20s
