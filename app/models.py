@@ -39,6 +39,13 @@ class SceneAnalysis(BaseModel):
 
 class ViralAnalysis(BaseModel):
     video: str
+    # meta video sumber — dipakai penerjemah IR→VN (rasio = dimensi target reproduksi).
+    # Semua opsional/berdefault → aman thd konsumen lama (viral_editor abaikan field ekstra).
+    width: int = 0
+    height: int = 0
+    fps: float = 0.0
+    duration_sec: float = 0.0
+    aspect_ratio: str = ""  # "9:16" | "1:1" | "16:9" | "" (kosong = tak diketahui)
     bpm: float | None = None
     subtitle_style: SubtitleStyle = Field(default_factory=SubtitleStyle)
     subtitle_segments: list[SubtitleSegment] = Field(default_factory=list)

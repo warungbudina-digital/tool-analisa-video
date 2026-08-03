@@ -15,6 +15,18 @@ def _ms(t0: float) -> int:
     return int((time.perf_counter() - t0) * 1000)
 
 
+def _aspect_ratio(w: int, h: int) -> str:
+    """Label rasio dari dimensi. Kosong kalau tak diketahui."""
+    if not w or not h:
+        return ""
+    r = w / h
+    if r < 0.85:
+        return "9:16"   # vertikal (reel/shorts)
+    if r < 1.15:
+        return "1:1"    # persegi
+    return "16:9"       # lanskap
+
+
 def analyze(video_path: str, run_asr: bool | None = None,
             run_semantic: bool | None = None) -> AnalyzeResponse:
     warnings: list[str] = []
@@ -84,6 +96,11 @@ def analyze(video_path: str, run_asr: bool | None = None,
 
     analysis = ViralAnalysis(
         video=os.path.basename(video_path),
+        width=meta.width,
+        height=meta.height,
+        fps=meta.fps,
+        duration_sec=meta.duration,
+        aspect_ratio=_aspect_ratio(meta.width, meta.height),
         bpm=aud.bpm,
         subtitle_style=subtitle_style,
         subtitle_segments=subtitle_segments,
