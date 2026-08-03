@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 import time
 
-from app.models import (AnalyzeResponse, FramingData, SceneAnalysis, SubtitleStyle,
-                         ViralAnalysis)
-from app.services import asr, audio, faces, hook as hook_mod, motion, probe, scene, semantic
+from app.models import (AnalyzeResponse, FramingData, LightingData, SceneAnalysis,
+                         SubtitleStyle, ViralAnalysis)
+from app.services import (asr, audio, faces, hook as hook_mod, lighting, motion, probe,
+                          scene, semantic)
 from app.services.frames import grab_frames
 
 ANALYZER_VERSION = "0.1.0"
@@ -61,6 +62,7 @@ def analyze(video_path: str, run_asr: bool | None = None,
         mot = motion.analyze_motion(video_path, sc.start, sc.end)
         trans = "cut" if i == 0 else motion.transition_before(video_path, prev_end, sc.start)
         fr = faces.analyze_framing(video_path, sc.start, sc.end)
+        lig = lighting.analyze_lighting(video_path, sc.start, sc.end)
         rms = audio.mean_rms(sc.start, sc.end, aud.rms_times, aud.rms_values)
 
         sem = {"semantic": "unknown", "emotion": "unknown", "meme": "unknown"}
@@ -80,6 +82,7 @@ def analyze(video_path: str, run_asr: bool | None = None,
             motion=mot["motion"], camera_movement=mot["camera_movement"], transition=trans,
             beat_sync=audio.beat_sync_for(sc.start, sc.end, aud.beat_times),
             framing=FramingData(faces=fr["faces"], speaker_position=fr["speaker_position"]),
+            lighting=LightingData(**lig),
             hook_strength=hook,
         ))
         prev_end = sc.end

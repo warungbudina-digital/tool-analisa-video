@@ -22,6 +22,16 @@ class FramingData(BaseModel):
     speaker_position: str = "unknown"
 
 
+class LightingData(BaseModel):
+    brightness: float = 0.0   # 0..1 (mean luminance / 255)
+    contrast: float = 0.0     # 0..1 (std luminance / 128)
+    warmth: float = 0.0       # signed -1..1 ((mean R - mean B)/255); + hangat, - dingin
+    saturation: float = 0.0   # 0..1
+    brightness_label: str = "normal"    # dark | normal | bright
+    contrast_label: str = "normal"      # low | normal | high
+    temperature_label: str = "neutral"  # warm | neutral | cool
+
+
 class SceneAnalysis(BaseModel):
     start: float
     end: float
@@ -34,6 +44,7 @@ class SceneAnalysis(BaseModel):
     transition: str = "cut"
     beat_sync: bool = False
     framing: FramingData = Field(default_factory=FramingData)
+    lighting: LightingData = Field(default_factory=LightingData)
     hook_strength: str = "weak_hook"
 
 
