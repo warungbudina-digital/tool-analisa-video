@@ -46,7 +46,9 @@ def analyze_motion(path: str, start: float, end: float) -> dict:
         elif mag > 3.0:
             cam = "fast_move"
         elif abs(divergence) > 40.0:
-            cam = "zoom"
+            # tanda divergence = ARAH: >0 aliran keluar (konten membesar) = zoom IN
+            # (punch-in), <0 aliran masuk = zoom OUT. Dulu di-abs() -> arah hilang.
+            cam = "zoom_in" if divergence > 0 else "zoom_out"
         elif translation > 0.6:
             cam = "pan"
         else:
