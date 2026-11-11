@@ -41,7 +41,7 @@ def healthz():
 def do_analyze(req: AnalyzeRequest):
     path = _safe_path(req.video_path)
     try:
-        return analyze(str(path), run_asr=req.run_asr, run_semantic=req.run_semantic)
+        return analyze(str(path), run_asr=req.run_asr, run_semantic=req.run_semantic, language=req.language)
     except Exception as exc:
         raise HTTPException(status_code=500,
                             detail={"error": "analyze_failed", "message": str(exc)})

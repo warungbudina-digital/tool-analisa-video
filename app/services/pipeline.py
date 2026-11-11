@@ -29,7 +29,7 @@ def _aspect_ratio(w: int, h: int) -> str:
 
 
 def analyze(video_path: str, run_asr: bool | None = None,
-            run_semantic: bool | None = None) -> AnalyzeResponse:
+            run_semantic: bool | None = None, language: str | None = None) -> AnalyzeResponse:
     warnings: list[str] = []
     timings: dict[str, int] = {}
 
@@ -90,9 +90,10 @@ def analyze(video_path: str, run_asr: bool | None = None,
 
     subtitle_segments = []
     subtitle_style = SubtitleStyle()
+    language_used = None
     if do_asr and meta.has_audio:
         t = time.perf_counter()
-        subtitle_segments, subtitle_style = asr.transcribe(video_path)
+        subtitle_segments, subtitle_style, language_used = asr.transcribe(video_path, language=language)
         timings["asr"] = _ms(t)
     elif do_asr and not meta.has_audio:
         warnings.append("asr_skipped_no_audio")
@@ -114,4 +115,5 @@ def analyze(video_path: str, run_asr: bool | None = None,
     if not do_asr and not do_sem:
         status = "deterministic_only"  # V1: field semantic/emotion/subtitle di-skip
     return AnalyzeResponse(status=status, analyzer_version=ANALYZER_VERSION,
-                           analysis=analysis, timings_ms=timings, warnings=warnings)
+                           analysis=analysis, timings_ms=timings, warnings=warnings,
+                           language_used=language_used)

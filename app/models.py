@@ -72,6 +72,11 @@ class AnalyzeRequest(BaseModel):
     # override opsional
     run_asr: bool | None = None
     run_semantic: bool | None = None
+    # bahasa ASR per-job (2026-11-11): "id"/"en" paksa, "auto" = auto-detect
+    # whisper eksplisit, None = tak disebut -> pakai default env ASR_LANGUAGE
+    # analyzer (perilaku lama, mundur-kompatibel). Literal -> FastAPI balas 422
+    # otomatis kalau nilai di luar daftar (jangan lolos diam-diam ke whisper).
+    language: Literal["id", "en", "auto"] | None = None
 
 
 class AnalyzeResponse(BaseModel):
@@ -80,3 +85,10 @@ class AnalyzeResponse(BaseModel):
     analysis: ViralAnalysis
     timings_ms: dict[str, int] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
+    # bahasa YANG BENAR-BENAR dipakai whisper (hasil resolve request/env/auto-
+    # detect) -- field TERPISAH dari `analysis`/ViralAnalysis (itu wajib identik
+    # persis dgn input viral_editor, lihat komentar di atas) supaya terlihat
+    # jelas "diterapkan" vs "diam-diam diabaikan" (pydantic abaikan field tak
+    # dikenal secara default -- analyzer versi lama tanpa field ini tak akan error,
+    # tapi respons JUGA tak akan punya key ini sama sekali, itu sinyalnya).
+    language_used: str | None = None
