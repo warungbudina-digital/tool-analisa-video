@@ -45,6 +45,41 @@ def _resolve_language(explicit: str | None) -> tuple[str | None, str]:
     return (None if raw == "auto" else raw), raw
 
 
+_RUN_SHORT_DUR = 1.5  # detik; ambang "pendek" per segmen
+# 10 (BUKAN 5): divalidasi thd job-24 nyata -- rentetan halusinasi asli
+# (episode 35:12, musik) panjang 33 segmen; rentetan TERPANJANG speech asli
+# yg legitim (seruan dramatis "Oh! Oh! No! Ah! Ah!" @10:12) panjang 6. 10 =
+# margin aman di 2 sisi (+4 dari 6, -23 dari 33) -- JANGAN turunkan ke <=6
+# tanpa validasi ulang, berisiko buang reaksi/dialog cepat yg asli.
+_RUN_MIN_LEN = 10
+
+
+def _mark_hallucination_runs(raw_segments: list[dict]) -> set[int]:
+    """Deteksi RENTETAN segmen super-pendek berurutan -- ciri nyata loop
+    halusinasi whisper (job-24, episode 35:12-35:38: >20 segmen 0.3-1.3dtk
+    berturut-turut, 1-2 token/segmen) yang LOLOS dari _is_hallucination()
+    krn metrik itu per-SEGMEN -- tiap segmen sendiri terlalu singkat utk kena
+    ambang token/karakternya. Episode speech asli yg cuma rusak transkripsi
+    (bkn loop) punya segmen BERDURASI NORMAL (cth job-24 24:32-24:56, 4
+    segmen @4dtk) -- TAK kena filter ini, sengaja (lihat memori
+    project_viral_analyzer.md: VAD diuji, bukan ucapan asli yg mau dibuang).
+    Balik set INDEX (bukan teks, krn teks boleh berisi placeholder kosong)."""
+    bad: set[int] = set()
+    run_start = None
+    for i, s in enumerate(raw_segments):
+        dur = float(s.get("end", 0.0)) - float(s.get("start", 0.0))
+        if dur < _RUN_SHORT_DUR:
+            if run_start is None:
+                run_start = i
+        else:
+            if run_start is not None and i - run_start >= _RUN_MIN_LEN:
+                bad.update(range(run_start, i))
+            run_start = None
+    if run_start is not None and len(raw_segments) - run_start >= _RUN_MIN_LEN:
+        bad.update(range(run_start, len(raw_segments)))
+    return bad
+
+
 def _is_hallucination(text: str, seg: dict) -> bool:
     """True kalau segmen kemungkinan besar halusinasi whisper (audio non-speech /
     musik / diam). Whisper tetap memuntahkan segmen berulang meski tak ada ucapan;
@@ -94,18 +129,29 @@ def transcribe(path: str, language: str | None = None) -> tuple[list[SubtitleSeg
         # yg DICOBA (bukan konfirmasi whisper berhasil pakai itu).
         return [], SubtitleStyle(), lang_label
 
+    raw_segments = result.get("segments", [])
+    run_bad = _mark_hallucination_runs(raw_segments)
+
     segs: list[SubtitleSegment] = []
     total_words = 0
     total_dur = 0.0
-    for s in result.get("segments", []):
+    dropped_run = 0
+    for i, s in enumerate(raw_segments):
         text = (s.get("text") or "").strip()
         if not text or _is_hallucination(text, s):
+            continue
+        if i in run_bad:
+            dropped_run += 1
             continue
         start = float(s.get("start", 0.0))
         end = float(s.get("end", 0.0))
         segs.append(SubtitleSegment(text=text, start=round(start, 3), end=round(end, 3)))
         total_words += len(text.split())
         total_dur += max(end - start, 0.0)
+    if dropped_run:
+        # jejak WAJIB -- jangan pernah buang diam2 (feedback_kegagalan_menyamar_sukses)
+        print(f"[asr] buang {dropped_run} segmen (rentetan halusinasi lintas-segmen)",
+              file=sys.stderr, flush=True)
 
     wca = round(total_words / len(segs), 2) if segs else None
     wps = (total_words / total_dur) if total_dur > 0 else 0.0
