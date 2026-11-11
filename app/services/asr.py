@@ -61,6 +61,7 @@ def transcribe(path: str) -> tuple[list[SubtitleSegment], SubtitleStyle]:
         # threshold no_speech/logprob/compression memicu fallback whisper pada non-speech.
         result = model.transcribe(
             path,
+            language="id",
             fp16=False,
             temperature=0.0,
             condition_on_previous_text=False,
