@@ -80,28 +80,40 @@ def _mark_hallucination_runs(raw_segments: list[dict]) -> set[int]:
     return bad
 
 
-def _is_hallucination(text: str, seg: dict) -> bool:
+def _is_hallucination(text: str, seg: dict) -> str | None:
     """True kalau segmen kemungkinan besar halusinasi whisper (audio non-speech /
     musik / diam). Whisper tetap memuntahkan segmen berulang meski tak ada ucapan;
-    kita saring pakai metrik per-segmen + penjaga repetisi eksplisit."""
+    kita saring pakai metrik per-segmen + penjaga repetisi eksplisit.
+
+    (2026-11-11) no_speech_prob>=0.6 SENDIRIAN (OR, bukan AND dgn avg_logprob)
+    terbukti salah lewat job-27/28 nyata (musik/nyanyian): no_speech_prob
+    whisper utk NYANYIAN sering 0.7-0.9 (musik keras mengaburkan deteksi
+    speech-nya) PADAHAL teksnya lirik koheren & avg_logprob bagus (-0.3..-0.6)
+    -- OR lama membuang ~95% lirik asli (job-27: 26/27 segmen gugur, cuma
+    "You" lolos; job-28: 10/17 gugur). ATURAN ASLI whisper sendiri (openai-
+    whisper transcribe(): avg_logprob BAIK membalik keputusan skip no_speech,
+    = efektif AND) tidak sekeras itu -- ikuti itu: nsp tinggi HARUS dibarengi
+    logprob jelek baru dianggap halusinasi. Divalidasi ulang thd job-24 asli
+    (episode 35:12 asli, klip 34:00-36:30) msh kena -- lihat run guard di
+    bawah, independen dari perubahan ini (dasarnya durasi segmen, bukan prob)."""
     try:
-        if float(seg.get("no_speech_prob", 0.0)) >= 0.6:
-            return True
-        if float(seg.get("avg_logprob", 0.0)) < -1.0:
-            return True
+        no_speech = float(seg.get("no_speech_prob", 0.0))
+        avg_logprob = float(seg.get("avg_logprob", 0.0))
+        if no_speech >= 0.6 and avg_logprob < -1.0:
+            return "no_speech+logprob"
         # compression_ratio tinggi = teks sangat mudah dikompres = berulang (mis. "2.1.1.1...")
         if float(seg.get("compression_ratio", 0.0)) > 2.4:
-            return True
+            return "compression_ratio"
     except (TypeError, ValueError):
         pass
     # penjaga repetisi eksplisit (jaring pengaman kalau metrik tak ada)
     toks = text.split()
     if len(toks) >= 6 and len(set(toks)) / len(toks) < 0.3:
-        return True
+        return "repetition_tokens"
     compact = text.replace(" ", "")
     if len(compact) >= 20 and len(set(compact)) <= 4:
-        return True
-    return False
+        return "repetition_chars"
+    return None
 
 
 def transcribe(path: str, language: str | None = None) -> tuple[list[SubtitleSegment], SubtitleStyle, str | None]:
@@ -136,9 +148,15 @@ def transcribe(path: str, language: str | None = None) -> tuple[list[SubtitleSeg
     total_words = 0
     total_dur = 0.0
     dropped_run = 0
+    drop_reasons: dict[str, int] = {}
     for i, s in enumerate(raw_segments):
         text = (s.get("text") or "").strip()
-        if not text or _is_hallucination(text, s):
+        if not text:
+            drop_reasons["empty_text"] = drop_reasons.get("empty_text", 0) + 1
+            continue
+        reason = _is_hallucination(text, s)
+        if reason:
+            drop_reasons[reason] = drop_reasons.get(reason, 0) + 1
             continue
         if i in run_bad:
             dropped_run += 1
@@ -151,6 +169,12 @@ def transcribe(path: str, language: str | None = None) -> tuple[list[SubtitleSeg
     if dropped_run:
         # jejak WAJIB -- jangan pernah buang diam2 (feedback_kegagalan_menyamar_sukses)
         print(f"[asr] buang {dropped_run} segmen (rentetan halusinasi lintas-segmen)",
+              file=sys.stderr, flush=True)
+    if drop_reasons:
+        # jejak WAJIB per-alasan (filter per-segmen DIAM sebelum ini -- lihat
+        # catatan 2026-11-11 di _is_hallucination: job-27/28 nyaris tak kebaca
+        # krn drop ini tak pernah ketara di log, dikira "nol = bersih")
+        print(f"[asr] buang per-segmen (alasan->jumlah): {drop_reasons}",
               file=sys.stderr, flush=True)
 
     wca = round(total_words / len(segs), 2) if segs else None
